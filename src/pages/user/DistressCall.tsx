@@ -8,6 +8,7 @@ import { Button } from '../../components/common/Button';
 import { TextArea } from '../../components/common/Input';
 import { ImageUpload } from '../../components/distress/ImageUpload';
 import { AIGuidancePanel } from '../../components/distress/AIGuidancePanel';
+import { AIChatbot, AIFloatingButton } from '../../components/distress/AIChatbot';
 import { Loader } from '../../components/common/Loader';
 import { useLocation } from '../../hooks/useLocation';
 import { useDistress } from '../../context/DistressContext';
@@ -29,6 +30,7 @@ export const DistressCall = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAnalysis, setLocalAIAnalysis] = useState<AIAnalysisResult | null>(null);
+  const [showAIChatbot, setShowAIChatbot] = useState(false);
 
   const handleImageUploaded = (url: string) => {
     setImageUrl(url);
@@ -119,17 +121,22 @@ export const DistressCall = () => {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto">
-        {/* Header with Back Button */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => navigate(ROUTES.DASHBOARD)}
-            className="flex items-center gap-2 text-[#5D4E4E] hover:text-[#FD7979] transition-colors font-medium"
-          >
-            <FiArrowLeft className="h-5 w-5" />
-            Back
-          </button>
-          <h1 className="text-xl font-bold text-[#5D4E4E]">Report Emergency</h1>
-          <div className="w-16"></div>
+        {/* Emergency Header */}
+        <div className="bg-gradient-to-r from-[#FD7979] to-[#E05A5A] rounded-2xl p-4 mb-6 shadow-[0_4px_0_#C54545]">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => navigate(ROUTES.DASHBOARD)}
+              className="flex items-center gap-2 text-white hover:text-white/80 transition-colors font-medium"
+            >
+              <FiArrowLeft className="h-5 w-5" />
+              Back
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+              <h1 className="text-xl font-bold text-white">Emergency Report</h1>
+            </div>
+            <div className="w-16"></div>
+          </div>
         </div>
 
         {/* Progress Steps */}
@@ -307,7 +314,19 @@ export const DistressCall = () => {
             </Card>
           </div>
         )}
+
+        {/* AI Chatbot */}
+        <AIChatbot
+          isOpen={showAIChatbot}
+          onClose={() => setShowAIChatbot(false)}
+          initialContext={description || undefined}
+        />
       </div>
+
+      {/* AI Floating Button */}
+      {!showAIChatbot && (
+        <AIFloatingButton onClick={() => setShowAIChatbot(true)} />
+      )}
     </Layout>
   );
 };

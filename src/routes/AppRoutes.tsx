@@ -17,6 +17,7 @@ import { Store } from '../pages/user/Store';
 // Vet Pages
 import { VetDashboard } from '../pages/vet/VetDashboard';
 import { DistressList } from '../pages/vet/DistressList';
+import { VetTracking } from '../pages/vet/VetTracking';
 import { VetStore } from '../pages/vet/VetStore';
 
 interface ProtectedRouteProps {
@@ -118,6 +119,14 @@ export const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={['vet']}>
             <DistressList />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path={`${ROUTES.VET_TRACKING}/:distressId`}
+        element={
+          <ProtectedRoute allowedRoles={['vet']}>
+            <VetTracking />
           </ProtectedRoute>
         }
       />

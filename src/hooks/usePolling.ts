@@ -69,10 +69,21 @@ export const usePolling = (options: UsePollingOptions = {}) => {
   const previousStatusRef = useRef<string | null>(null);
   const previousResponseCountRef = useRef<number>(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isStoppedRef = useRef(false);
+
+  // Function to stop polling
+  const stopPolling = useCallback(() => {
+    isStoppedRef.current = true;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsPolling(false);
+  }, []);
 
   // Poll for distress updates (for users tracking an emergency)
   const pollDistressUpdates = useCallback(async () => {
-    if (!distressId) return;
+    if (!distressId || isStoppedRef.current) return;
 
     try {
       const params = lastPollTimeRef.current
@@ -83,6 +94,9 @@ export const usePolling = (options: UsePollingOptions = {}) => {
         `/location/poll/${distressId}`,
         { params }
       );
+
+      // Check if polling was stopped during the request
+      if (isStoppedRef.current) return;
 
       const { distress, locations, hasUpdates } = response.data;
 
@@ -99,8 +113,11 @@ export const usePolling = (options: UsePollingOptions = {}) => {
 
         // Check for status changes
         if (previousStatusRef.current !== distress.status) {
-          if (distress.status === 'resolved' && onDistressResolved) {
+          if ((distress.status === 'resolved' || distress.status === 'cancelled') && onDistressResolved) {
+            // Stop polling immediately when resolved or cancelled
+            stopPolling();
             onDistressResolved({ distressId });
+            return;
           }
           previousStatusRef.current = distress.status;
         }
@@ -121,10 +138,12 @@ export const usePolling = (options: UsePollingOptions = {}) => {
       console.error('Polling error:', err);
       setError('Failed to fetch updates');
     }
-  }, [distressId, onLocationUpdate, onDistressUpdated, onDistressResolved]);
+  }, [distressId, onLocationUpdate, onDistressUpdated, onDistressResolved, stopPolling]);
 
   // Poll for nearby distresses (for vets)
   const pollNearbyDistresses = useCallback(async () => {
+    if (isStoppedRef.current) return;
+
     try {
       const params = lastPollTimeRef.current
         ? { since: lastPollTimeRef.current }
@@ -134,6 +153,9 @@ export const usePolling = (options: UsePollingOptions = {}) => {
         '/location/poll-nearby',
         { params }
       );
+
+      // Check if polling was stopped during the request
+      if (isStoppedRef.current) return;
 
       const { distresses, hasUpdates } = response.data;
 
@@ -152,12 +174,11 @@ export const usePolling = (options: UsePollingOptions = {}) => {
 
   // Start polling
   useEffect(() => {
+    // Reset the stopped flag when starting fresh
+    isStoppedRef.current = false;
+
     if (!enabled) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      setIsPolling(false);
+      stopPolling();
       return;
     }
 
@@ -174,13 +195,9 @@ export const usePolling = (options: UsePollingOptions = {}) => {
     intervalRef.current = setInterval(pollFn, pollingInterval);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      setIsPolling(false);
+      stopPolling();
     };
-  }, [enabled, distressId, pollingInterval, pollDistressUpdates, pollNearbyDistresses, onNewDistress]);
+  }, [enabled, distressId, pollingInterval, pollDistressUpdates, pollNearbyDistresses, onNewDistress, stopPolling]);
 
   // Update location via HTTP POST
   const updateLocation = useCallback(
@@ -211,5 +228,6 @@ export const usePolling = (options: UsePollingOptions = {}) => {
     error,
     updateLocation,
     refresh,
+    stopPolling,
   };
 };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiMapPin, FiClock, FiRefreshCw, FiAlertTriangle, FiAlertCircle, FiNavigation, FiHome } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { Layout } from '../../components/layout/Layout';
@@ -11,9 +12,10 @@ import { usePolling } from '../../hooks/usePolling';
 import { distressService, type Distress } from '../../services/distress';
 import { locationService } from '../../services/location';
 import { formatDistance, formatDateTime } from '../../utils/validators';
-import { SEVERITY_COLORS } from '../../utils/constants';
+import { SEVERITY_COLORS, ROUTES } from '../../utils/constants';
 
 export const DistressList = () => {
+  const navigate = useNavigate();
   const [distresses, setDistresses] = useState<Distress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDistress, setSelectedDistress] = useState<Distress | null>(null);
@@ -79,15 +81,16 @@ export const DistressList = () => {
         responseMessage
       );
       toast.success('Response sent successfully!');
-      setSelectedDistress(null);
-      setResponseMessage('');
-      loadDistresses();
+      // Navigate to tracking page for this distress
+      navigate(`${ROUTES.VET_TRACKING}/${selectedDistress._id}`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       toast.error(error.response?.data?.message || 'Failed to respond');
       console.error(err);
     } finally {
       setIsResponding(false);
+      setSelectedDistress(null);
+      setResponseMessage('');
     }
   };
 

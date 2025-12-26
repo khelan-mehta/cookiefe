@@ -44,6 +44,7 @@ export const ROUTES = {
   STORE: '/store',
   VET_DASHBOARD: '/vet/dashboard',
   VET_DISTRESS_LIST: '/vet/distress-list',
+  VET_TRACKING: '/vet/tracking',
   VET_STORE: '/vet/store',
   VET_STORE_EDITOR: '/vet/store/edit',
 } as const;

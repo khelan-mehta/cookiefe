@@ -8,6 +8,7 @@ import { Button } from "../../components/common/Button";
 import { Loader } from "../../components/common/Loader";
 import { LiveMap } from "../../components/map/LiveMap";
 import { AIGuidancePanel } from "../../components/distress/AIGuidancePanel";
+import { AIChatbot, AIFloatingButton } from "../../components/distress/AIChatbot";
 import { VetResponseList } from "../../components/distress/VetResponseCard";
 import { ConfirmModal } from "../../components/common/Modal";
 import { useDistress } from "../../context/DistressContext";
@@ -39,6 +40,7 @@ export const Tracking = () => {
     lat: number;
     lng: number;
   } | null>(null);
+  const [showAIChatbot, setShowAIChatbot] = useState(false);
   const locationWatchRef = useRef<number | null>(null);
 
   const sendUserLocation = useCallback(async (coords: [number, number]) => {
@@ -92,17 +94,22 @@ export const Tracking = () => {
     []
   );
 
-  usePolling({
+  const { stopPolling } = usePolling({
     distressId: activeDistress?._id,
     pollingInterval: 3000,
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
+      // Stop location watching
+      if (locationWatchRef.current !== null) {
+        locationService.clearWatch(locationWatchRef.current);
+        locationWatchRef.current = null;
+      }
       toast.success("Emergency resolved!");
       clearDistress();
       navigate(ROUTES.DASHBOARD);
     },
     onLocationUpdate: handleLocationUpdate,
-    enabled: !!activeDistress?._id,
+    enabled: !!activeDistress?._id && activeDistress?.status !== 'resolved' && activeDistress?.status !== 'cancelled',
   });
 
   useEffect(() => {
@@ -118,12 +125,13 @@ export const Tracking = () => {
     setSelectingVetId(vetId);
 
     try {
-      const result = await distressService.selectVet(
+      await distressService.selectVet(
         activeDistress._id,
         vetId,
         mode
       );
-      setActiveDistress(result.distress as Distress);
+      // Fetch full distress data with populated fields
+      await refreshActiveDistress();
       toast.success("Vet selected! Help is on the way.");
     } catch (err) {
       toast.error("Failed to select vet. Please try again.");
@@ -140,6 +148,13 @@ export const Tracking = () => {
     setIsCancelling(true);
 
     try {
+      // Stop polling and location watching first
+      stopPolling();
+      if (locationWatchRef.current !== null) {
+        locationService.clearWatch(locationWatchRef.current);
+        locationWatchRef.current = null;
+      }
+
       await distressService.cancelDistress(activeDistress._id);
       toast.success("Emergency cancelled");
       clearDistress();
@@ -159,6 +174,13 @@ export const Tracking = () => {
     setIsResolving(true);
 
     try {
+      // Stop polling and location watching first
+      stopPolling();
+      if (locationWatchRef.current !== null) {
+        locationService.clearWatch(locationWatchRef.current);
+        locationWatchRef.current = null;
+      }
+
       await distressService.resolveDistress(activeDistress._id);
       toast.success("Emergency resolved! Thank you.");
       clearDistress();
@@ -374,7 +396,19 @@ export const Tracking = () => {
           confirmText="Yes, Resolved"
           isLoading={isResolving}
         />
+
+        {/* AI Chatbot */}
+        <AIChatbot
+          isOpen={showAIChatbot}
+          onClose={() => setShowAIChatbot(false)}
+          initialContext={activeDistress.description}
+        />
       </div>
+
+      {/* AI Floating Button */}
+      {!showAIChatbot && (
+        <AIFloatingButton onClick={() => setShowAIChatbot(true)} />
+      )}
     </Layout>
   );
 };
