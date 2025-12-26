@@ -68,7 +68,7 @@ export const usePolling = (options: UsePollingOptions = {}) => {
   const lastPollTimeRef = useRef<string | null>(null);
   const previousStatusRef = useRef<string | null>(null);
   const previousResponseCountRef = useRef<number>(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll for distress updates (for users tracking an emergency)
   const pollDistressUpdates = useCallback(async () => {
