@@ -9,6 +9,7 @@ import { Loader } from "../../components/common/Loader";
 import { LiveMap } from "../../components/map/LiveMap";
 import { AIGuidancePanel } from "../../components/distress/AIGuidancePanel";
 import { AIChatbot, AIFloatingButton } from "../../components/distress/AIChatbot";
+import { StoreRecommendations } from "../../components/distress/StoreRecommendations";
 import { VetResponseList } from "../../components/distress/VetResponseCard";
 import { ConfirmModal } from "../../components/common/Modal";
 import { useDistress } from "../../context/DistressContext";
@@ -289,9 +290,15 @@ export const Tracking = () => {
               <AIGuidancePanel
                 analysis={aiAnalysis || activeDistress.aiAnalysis || null}
                 collapsible
-                initialCollapsed={isInProgress}
+                initialCollapsed={false}
               />
             )}
+
+            {/* Store Recommendations */}
+            <StoreRecommendations
+              description={activeDistress.description}
+              severity={aiAnalysis?.severity || activeDistress.aiAnalysis?.severity}
+            />
 
             {/* Vet Responses (when waiting) */}
             {!activeDistress.selectedVetId && (
@@ -402,6 +409,7 @@ export const Tracking = () => {
           isOpen={showAIChatbot}
           onClose={() => setShowAIChatbot(false)}
           initialContext={activeDistress.description}
+          showHistory={true}
         />
       </div>
 

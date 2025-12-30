@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiUser, FiPhone, FiMail, FiClock, FiEdit2, FiHeart } from 'react-icons/fi';
+import { FiUser, FiPhone, FiMail, FiClock, FiEdit2, FiHeart, FiMessageCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { Layout } from '../../components/layout/Layout';
 import { Card, CardBody, CardHeader } from '../../components/common/Card';
@@ -7,6 +7,7 @@ import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
 import { Loader } from '../../components/common/Loader';
 import { Modal } from '../../components/common/Modal';
+import { AIChatbot, AIFloatingButton } from '../../components/distress/AIChatbot';
 import { useAuth } from '../../context/AuthContext';
 import { userService, type DistressHistory } from '../../services/user';
 import { formatDateTime } from '../../utils/validators';
@@ -19,6 +20,7 @@ export const Profile = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [history, setHistory] = useState<DistressHistory | null>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [showAIChatbot, setShowAIChatbot] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -176,6 +178,29 @@ export const Profile = () => {
           </CardBody>
         </Card>
 
+        {/* AI Help Card */}
+        <Card className="mt-6">
+          <CardBody>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-r from-[#FD7979] to-[#FDACAC] rounded-full flex items-center justify-center shadow-lg">
+                  <FiMessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#5D4E4E]">AI Assistant</h3>
+                  <p className="text-sm text-[#5D4E4E] opacity-70">
+                    Get help with pet care questions
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setShowAIChatbot(true)}>
+                <FiMessageCircle className="h-4 w-4 mr-2" />
+                Chat Now
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
         {/* Edit Modal */}
         <Modal
           isOpen={isEditing}
@@ -216,7 +241,19 @@ export const Profile = () => {
             </div>
           </div>
         </Modal>
+
+        {/* AI Chatbot */}
+        <AIChatbot
+          isOpen={showAIChatbot}
+          onClose={() => setShowAIChatbot(false)}
+          showHistory={true}
+        />
       </div>
+
+      {/* AI Floating Button */}
+      {!showAIChatbot && (
+        <AIFloatingButton onClick={() => setShowAIChatbot(true)} />
+      )}
     </Layout>
   );
 };

@@ -71,42 +71,50 @@ export const DistressCall = () => {
     setIsAnalyzing(true);
 
     try {
-      const [distressResult] = await Promise.all([
-        distressService.createDistress({
-          imageUrl,
-          description,
-          location: {
-            coordinates,
-          },
-        }),
-        aiService.analyzeDistress(imageUrl, description).then((result) => {
-          setLocalAIAnalysis(result.analysis);
-          setAIAnalysis(result.analysis);
-          setIsAnalyzing(false);
+      // First create the distress
+      const distressResult = await distressService.createDistress({
+        imageUrl,
+        description,
+        location: {
+          coordinates,
+        },
+      });
 
-          if (distressResult?.distress?.id) {
-            distressService.updateAIAnalysis(
-              distressResult.distress.id,
-              result.analysis
-            ).catch(console.error);
-          }
-        }).catch((err) => {
+      // Then start AI analysis in parallel with fetching full distress
+      const [aiResult, fullDistressResult] = await Promise.all([
+        aiService.analyzeDistress(imageUrl, description).catch((err) => {
           console.error('AI analysis failed:', err);
-          setIsAnalyzing(false);
+          return null;
         }),
+        distressService.getDistress(distressResult.distress.id),
       ]);
 
+      setIsAnalyzing(false);
+
+      // If AI analysis succeeded, save it
+      if (aiResult?.analysis) {
+        setLocalAIAnalysis(aiResult.analysis);
+        setAIAnalysis(aiResult.analysis);
+
+        // Save to distress in background
+        distressService.updateAIAnalysis(
+          distressResult.distress.id,
+          aiResult.analysis
+        ).catch(console.error);
+
+        // Update the full distress with AI analysis
+        fullDistressResult.distress.aiAnalysis = aiResult.analysis;
+      }
+
       toast.success('Emergency reported! Help is on the way.');
-
-      const fullDistress = await distressService.getDistress(distressResult.distress.id);
-      setActiveDistress(fullDistress.distress);
-
+      setActiveDistress(fullDistressResult.distress);
       navigate(ROUTES.TRACKING);
     } catch (err) {
       toast.error('Failed to create emergency. Please try again.');
       console.error(err);
     } finally {
       setIsSubmitting(false);
+      setIsAnalyzing(false);
     }
   };
 

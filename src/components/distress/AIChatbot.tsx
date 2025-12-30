@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { FiX, FiSend, FiMessageCircle } from 'react-icons/fi';
-import { aiService } from '../../services/ai';
-import { Button } from '../common/Button';
-import { Loader } from '../common/Loader';
+import { FiX, FiSend, FiMessageCircle, FiPhone, FiClock } from 'react-icons/fi';
+import { aiService, type SimilarQuery } from '../../services/ai';
 
 interface Message {
   id: string;
@@ -16,12 +14,16 @@ interface AIChatbotProps {
   onClose: () => void;
   initialContext?: string;
   animalType?: string;
+  showHistory?: boolean;
 }
 
-export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AIChatbotProps) => {
+export const AIChatbot = ({ isOpen, onClose, initialContext, animalType, showHistory = false }: AIChatbotProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [chatHistoryId, setChatHistoryId] = useState<string | undefined>();
+  const [similarQueries, setSimilarQueries] = useState<SimilarQuery[]>([]);
+  const [showSimilar, setShowSimilar] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -38,8 +40,13 @@ export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AICha
           timestamp: new Date(),
         },
       ]);
+
+      // Fetch similar past queries if context is provided
+      if (initialContext && showHistory) {
+        fetchSimilarQueries(initialContext);
+      }
     }
-  }, [isOpen, initialContext, messages.length]);
+  }, [isOpen, initialContext, messages.length, showHistory]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -50,6 +57,18 @@ export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AICha
       inputRef.current?.focus();
     }
   }, [isOpen]);
+
+  const fetchSimilarQueries = async (query: string) => {
+    try {
+      const result = await aiService.getSimilarQueries(query);
+      if (result.queries.length > 0) {
+        setSimilarQueries(result.queries);
+        setShowSimilar(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch similar queries:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,44 +82,27 @@ export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AICha
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input.trim();
     setInput('');
     setIsLoading(true);
 
     try {
-      // Use the guidance endpoint for chat
-      const contextQuery = initialContext
-        ? `Context: ${initialContext}\n\nUser question: ${input.trim()}`
-        : input.trim();
+      // Use the new chat endpoint
+      const response = await aiService.chat(
+        userInput,
+        initialContext,
+        chatHistoryId
+      );
 
-      const response = await aiService.getGuidance(contextQuery, animalType);
-
-      // Format the guidance response into a readable message
-      let assistantContent = '';
-
-      if (response.guidance.immediateSteps && response.guidance.immediateSteps.length > 0) {
-        assistantContent += `**Immediate Steps:**\n`;
-        response.guidance.immediateSteps.forEach((step, i) => {
-          assistantContent += `${i + 1}. ${step}\n`;
-        });
-        assistantContent += '\n';
-      }
-
-      if (response.guidance.suggestions && response.guidance.suggestions.length > 0) {
-        assistantContent += `**Suggestions:**\n`;
-        response.guidance.suggestions.forEach((suggestion) => {
-          assistantContent += `• ${suggestion}\n`;
-        });
-        assistantContent += '\n';
-      }
-
-      if (response.guidance.disclaimer) {
-        assistantContent += `\n*${response.guidance.disclaimer}*`;
+      // Save chat history ID for subsequent messages
+      if (response.chatHistoryId) {
+        setChatHistoryId(response.chatHistoryId);
       }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: assistantContent || 'I apologize, but I could not generate a response. Please try again or contact a veterinarian directly.',
+        content: response.response || 'I apologize, but I could not generate a response. Please try again or contact a veterinarian directly.',
         timestamp: new Date(),
       };
 
@@ -117,6 +119,20 @@ export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AICha
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleUsePastQuery = (query: SimilarQuery) => {
+    // Add the past query and answer to the chat
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `📋 **From your past query:**\n\n"${query.query}"\n\n${query.answer || 'No recorded answer.'}\n\n${query.contactNumber ? `📞 Contact: ${query.contactNumber}` : ''}`,
+        timestamp: new Date(),
+      },
+    ]);
+    setShowSimilar(false);
   };
 
   if (!isOpen) return null;
@@ -142,6 +158,38 @@ export const AIChatbot = ({ isOpen, onClose, initialContext, animalType }: AICha
             <FiX className="h-5 w-5 text-white" />
           </button>
         </div>
+
+        {/* Similar Past Queries */}
+        {showSimilar && similarQueries.length > 0 && (
+          <div className="p-3 bg-[#FEEAC9] border-b-2 border-[#FFCDC9]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-bold text-[#5D4E4E]">📋 Similar Past Queries</span>
+              <button
+                onClick={() => setShowSimilar(false)}
+                className="text-xs text-[#5D4E4E] hover:text-[#FD7979]"
+              >
+                Hide
+              </button>
+            </div>
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {similarQueries.slice(0, 3).map((query) => (
+                <button
+                  key={query.id}
+                  onClick={() => handleUsePastQuery(query)}
+                  className="w-full text-left p-2 bg-white rounded-lg hover:bg-[#FFF9F0] transition-colors border border-[#FFCDC9]"
+                >
+                  <p className="text-xs text-[#5D4E4E] line-clamp-1">{query.query}</p>
+                  {query.contactNumber && (
+                    <p className="text-xs text-[#FD7979] flex items-center gap-1 mt-1">
+                      <FiPhone className="h-3 w-3" />
+                      {query.contactNumber}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FFF9F0]">
