@@ -59,8 +59,8 @@ export const DistressList = () => {
     updateVetLocationAndLoad().then(() => loadDistresses());
   }, [updateVetLocationAndLoad, loadDistresses]);
 
-  usePolling({
-    pollingInterval: 5000,
+  const { refresh: refreshPolling, isPolling } = usePolling({
+    pollingInterval: 20000, // 20 seconds auto-refresh
     onNewDistress: (data) => {
       if (data.distresses && data.distresses.length > 0) {
         loadDistresses();
@@ -69,6 +69,14 @@ export const DistressList = () => {
     },
     enabled: true,
   });
+
+  const handleManualRefresh = useCallback(() => {
+    setIsLoading(true);
+    loadDistresses().then(() => {
+      refreshPolling();
+      toast.success("Refreshed successfully!");
+    });
+  }, [loadDistresses, refreshPolling]);
 
   const handleRespond = async () => {
     if (!selectedDistress) return;
@@ -109,12 +117,10 @@ export const DistressList = () => {
           </div>
           <Button
             variant="ghost"
-            onClick={() => {
-              setIsLoading(true);
-              loadDistresses();
-            }}
+            onClick={handleManualRefresh}
+            disabled={isLoading || isPolling}
           >
-            <FiRefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <FiRefreshCw className={`h-4 w-4 mr-2 ${(isLoading || isPolling) ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>

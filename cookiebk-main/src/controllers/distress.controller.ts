@@ -140,12 +140,29 @@ export const getActiveDistress = async (
       throw ApiError.unauthorized();
     }
 
-    const distress = await Distress.findOne({
-      userId: req.user._id,
-      status: { $in: ['pending', 'responded', 'in_progress'] },
-    })
-      .populate('responses.vetId', 'clinicName clinicAddress')
-      .populate('selectedVetId', 'clinicName clinicAddress location userId');
+    let distress = null;
+
+    // For users: find their own active distress
+    if (req.user.role === 'user') {
+      distress = await Distress.findOne({
+        userId: req.user._id,
+        status: { $in: ['pending', 'responded', 'in_progress'] },
+      })
+        .populate('responses.vetId', 'clinicName clinicAddress')
+        .populate('selectedVetId', 'clinicName clinicAddress location userId');
+    }
+    // For vets: find distress where they are assigned
+    else if (req.user.role === 'vet') {
+      const vetProfile = await Vet.findOne({ userId: req.user._id });
+      if (vetProfile) {
+        distress = await Distress.findOne({
+          selectedVetId: vetProfile._id,
+          status: { $in: ['in_progress'] },
+        })
+          .populate('userId', 'name phone avatar')
+          .populate('selectedVetId', 'clinicName clinicAddress location userId');
+      }
+    }
 
     res.json({
       success: true,

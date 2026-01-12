@@ -1,14 +1,49 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiUser, FiLogOut, FiMenu, FiX, FiHome, FiShoppingBag, FiAlertCircle, FiPackage } from 'react-icons/fi';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useDistress } from '../../context/DistressContext';
+import { distressService, type Distress } from '../../services/distress';
 import { ROUTES } from '../../utils/constants';
 
 export const Header = () => {
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, vetProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [vetActiveEmergency, setVetActiveEmergency] = useState<Distress | null>(null);
+
+  // Always call useDistress hook (DistressProvider wraps everything)
+  const { activeDistress: userActiveDistress } = useDistress();
+
+  // Fetch vet's assigned emergencies (for vets)
+  useEffect(() => {
+    if (user?.role === 'vet' && isAuthenticated && vetProfile) {
+      const fetchVetEmergency = async () => {
+        try {
+          const response = await distressService.getActiveDistress();
+          if (response.distress && response.distress.selectedVetId?._id === vetProfile._id) {
+            setVetActiveEmergency(response.distress);
+          } else {
+            setVetActiveEmergency(null);
+          }
+        } catch (error) {
+          console.error('Failed to fetch vet emergency:', error);
+          setVetActiveEmergency(null);
+        }
+      };
+
+      fetchVetEmergency();
+      // Poll every 20 seconds to update vet emergency status
+      const interval = setInterval(fetchVetEmergency, 20000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.role, isAuthenticated, vetProfile]);
+
+  const activeEmergency = user?.role === 'vet' ? vetActiveEmergency : userActiveDistress;
+  const hasActiveEmergency = activeEmergency &&
+    activeEmergency.status !== 'resolved' &&
+    activeEmergency.status !== 'cancelled';
 
   const handleLogout = async () => {
     await logout();
@@ -73,7 +108,7 @@ export const Header = () => {
             {isAuthenticated && (
               <>
                 {/* Desktop Navigation - Pill style */}
-                <nav className="hidden md:flex items-center">
+                <nav className="hidden md:flex items-center gap-3">
                   <div className="flex items-center gap-2 bg-[#FEEAC9] p-1.5 rounded-full">
                     <NavLink to={getDashboardRoute()} icon={FiHome}>
                       Home
@@ -94,6 +129,18 @@ export const Header = () => {
                       </>
                     )}
                   </div>
+
+                  {/* Active Emergency Indicator */}
+                  {hasActiveEmergency && (
+                    <Link
+                      to={user?.role === 'vet' ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}` : ROUTES.TRACKING}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#FD7979] text-white rounded-full hover:bg-[#E05A5A] transition-all shadow-[0_3px_0_#E05A5A] animate-pulse"
+                    >
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      <FiAlertCircle className="h-4 w-4" />
+                      <span className="font-medium text-sm">Active Emergency</span>
+                    </Link>
+                  )}
                 </nav>
 
                 {/* User section with cute styling */}
@@ -163,8 +210,21 @@ export const Header = () => {
 
       {/* Mobile Menu - Cute card style */}
       {isMenuOpen && isAuthenticated && (
-        <div className="md:hidden absolute left-4 right-4 top-20 bg-white rounded-2xl border-2 border-[#FFCDC9] shadow-[0_8px_0_#FDACAC] overflow-hidden animate-slideUp">
+        <div className="md:hidden absolute left-4 right-4 top-20 bg-white rounded-2xl border-2 border-[#FFCDC9] shadow-[0_8px_0_#FDACAC] overflow-hidden animate-slideUp z-50">
           <nav className="p-4 space-y-2">
+            {/* Active Emergency Indicator - Mobile */}
+            {hasActiveEmergency && (
+              <Link
+                to={user?.role === 'vet' ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}` : ROUTES.TRACKING}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#FD7979] text-white animate-pulse"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <div className="w-2 h-2 bg-white rounded-full"></div>
+                <FiAlertCircle className="h-5 w-5" />
+                <span className="font-medium">Active Emergency</span>
+              </Link>
+            )}
+
             <Link
               to={getDashboardRoute()}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${

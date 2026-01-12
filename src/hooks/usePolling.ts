@@ -41,7 +41,7 @@ interface NearbyDistressesResponse {
 
 interface UsePollingOptions {
   distressId?: string;
-  pollingInterval?: number; // in milliseconds, default 3000 (3 seconds)
+  pollingInterval?: number; // in milliseconds, default 20000 (20 seconds)
   onLocationUpdate?: (data: { coordinates: [number, number]; userId?: string }) => void;
   onVetResponse?: (data: { distressId: string; response: unknown }) => void;
   onDistressUpdated?: (data: { distressId: string; distress: DistressUpdate }) => void;
@@ -55,7 +55,7 @@ interface UsePollingOptions {
 export const usePolling = (options: UsePollingOptions = {}) => {
   const {
     distressId,
-    pollingInterval = 3000,
+    pollingInterval = 20000,
     onLocationUpdate,
     onDistressUpdated,
     onDistressResolved,

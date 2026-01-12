@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheck, FiX, FiPhone, FiMapPin, FiNavigation, FiArrowLeft, FiAlertCircle } from "react-icons/fi";
+import { FiCheck, FiX, FiPhone, FiMapPin, FiNavigation, FiArrowLeft, FiAlertCircle, FiRefreshCw } from "react-icons/fi";
 import { Layout } from "../../components/layout/Layout";
 import { Card, CardBody } from "../../components/common/Card";
 import { Button } from "../../components/common/Button";
 import { Loader } from "../../components/common/Loader";
 import { LiveMap } from "../../components/map/LiveMap";
-import { AIGuidancePanel } from "../../components/distress/AIGuidancePanel";
 import { AIChatbot, AIFloatingButton } from "../../components/distress/AIChatbot";
 import { ConfirmModal } from "../../components/common/Modal";
 import { usePolling } from "../../hooks/usePolling";
@@ -127,9 +126,9 @@ export const VetTracking = () => {
     []
   );
 
-  const { stopPolling } = usePolling({
+  const { stopPolling, refresh, isPolling } = usePolling({
     distressId: distressId,
-    pollingInterval: 3000,
+    pollingInterval: 20000, // 20 seconds auto-refresh
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
       // Stop location watching
@@ -143,6 +142,11 @@ export const VetTracking = () => {
     onLocationUpdate: handleLocationUpdate,
     enabled: !!distressId && !wasDeclined && distress?.status !== 'resolved' && distress?.status !== 'cancelled',
   });
+
+  const handleRefresh = useCallback(() => {
+    refresh();
+    toast.success("Refreshing emergency data...");
+  }, [refresh]);
 
   const handleResolve = async () => {
     if (!distressId) return;
@@ -239,14 +243,24 @@ export const VetTracking = () => {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate(ROUTES.VET_DISTRESS_LIST)}
-          className="flex items-center gap-2 text-[#5D4E4E] hover:text-[#FD7979] transition-colors font-medium mb-4"
-        >
-          <FiArrowLeft className="h-5 w-5" />
-          Back to Emergencies
-        </button>
+        {/* Header with Back and Refresh Button */}
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={() => navigate(ROUTES.VET_DISTRESS_LIST)}
+            className="flex items-center gap-2 text-[#5D4E4E] hover:text-[#FD7979] transition-colors font-medium"
+          >
+            <FiArrowLeft className="h-5 w-5" />
+            Back to Emergencies
+          </button>
+          <Button
+            variant="ghost"
+            onClick={handleRefresh}
+            disabled={isPolling}
+          >
+            <FiRefreshCw className={`h-4 w-4 mr-2 ${isPolling ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
 
         {/* Status Banner */}
         <Card
@@ -362,15 +376,6 @@ export const VetTracking = () => {
                 )}
               </CardBody>
             </Card>
-
-            {/* AI Guidance */}
-            {distress.aiAnalysis && (
-              <AIGuidancePanel
-                analysis={distress.aiAnalysis}
-                collapsible
-                initialCollapsed={isInProgress}
-              />
-            )}
 
             {/* Actions */}
             {isInProgress && (

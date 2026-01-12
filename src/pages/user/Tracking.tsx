@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheck, FiX, FiPhone, FiMapPin, FiClock, FiNavigation } from "react-icons/fi";
+import { FiCheck, FiX, FiPhone, FiMapPin, FiClock, FiNavigation, FiRefreshCw } from "react-icons/fi";
 import { Layout } from "../../components/layout/Layout";
 import { Card, CardBody } from "../../components/common/Card";
 import { Button } from "../../components/common/Button";
@@ -95,9 +95,9 @@ export const Tracking = () => {
     []
   );
 
-  const { stopPolling } = usePolling({
+  const { stopPolling, refresh, isPolling } = usePolling({
     distressId: activeDistress?._id,
-    pollingInterval: 3000,
+    pollingInterval: 20000, // 20 seconds auto-refresh
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
       // Stop location watching
@@ -112,6 +112,11 @@ export const Tracking = () => {
     onLocationUpdate: handleLocationUpdate,
     enabled: !!activeDistress?._id && activeDistress?.status !== 'resolved' && activeDistress?.status !== 'cancelled',
   });
+
+  const handleRefresh = useCallback(() => {
+    refresh();
+    toast.success("Refreshing emergency data...");
+  }, [refresh]);
 
   useEffect(() => {
     if (!activeDistress) {
@@ -225,6 +230,19 @@ export const Tracking = () => {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto">
+        {/* Header with Refresh Button */}
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold text-[#5D4E4E]">Emergency Tracking</h1>
+          <Button
+            variant="ghost"
+            onClick={handleRefresh}
+            disabled={isPolling}
+          >
+            <FiRefreshCw className={`h-4 w-4 mr-2 ${isPolling ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+
         {/* Status Banner */}
         <Card
           className={`mb-6 ${
