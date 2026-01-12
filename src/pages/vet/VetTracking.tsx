@@ -33,7 +33,8 @@ export const VetTracking = () => {
   } | null>(null);
   const [wasDeclined, setWasDeclined] = useState(false);
   const [showAIChatbot, setShowAIChatbot] = useState(false);
-  const locationWatchRef = useRef<number | null>(null);
+  const lastLocationUpdateRef = useRef<number>(0);
+  const locationCacheRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // Load distress details
   const loadDistress = useCallback(async () => {
@@ -71,44 +72,48 @@ export const VetTracking = () => {
     loadDistress();
   }, [loadDistress]);
 
-  // Send vet location updates when in progress
-  const sendVetLocation = useCallback(async (coords: [number, number]) => {
-    if (!distressId || !distress?.selectedVetId) return;
-    try {
-      await locationService.updateDistressLocation(distressId, coords);
-      console.log('Vet location sent:', coords);
-    } catch (error) {
-      console.error('Failed to send vet location:', error);
-    }
-  }, [distressId, distress?.selectedVetId]);
-
-  // Watch vet's location and send updates
-  useEffect(() => {
+  // Get and cache vet location, only update every 10 seconds
+  const updateVetLocation = useCallback(async () => {
     if (!distressId || !distress?.selectedVetId || wasDeclined) return;
 
-    const watchId = locationService.watchPosition(
-      (position) => {
-        const coords: [number, number] = [
-          position.coords.longitude,
-          position.coords.latitude,
-        ];
-        setVetLiveLocation({ lng: coords[0], lat: coords[1] });
-        sendVetLocation(coords);
-      },
-      (error) => {
-        console.error('Location watch error:', error);
-      }
-    );
+    const now = Date.now();
+    // Only update if 10 seconds have passed since last update
+    if (now - lastLocationUpdateRef.current < 10000 && locationCacheRef.current) {
+      return;
+    }
 
-    locationWatchRef.current = watchId;
+    try {
+      const position = await locationService.getCurrentPosition();
+      const coords: [number, number] = [
+        position.coords.longitude,
+        position.coords.latitude,
+      ];
 
-    return () => {
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
+      const newLocation = { lng: coords[0], lat: coords[1] };
+
+      // Only update if coordinates actually changed significantly (more than ~10 meters)
+      if (!locationCacheRef.current ||
+          Math.abs(locationCacheRef.current.lat - newLocation.lat) > 0.0001 ||
+          Math.abs(locationCacheRef.current.lng - newLocation.lng) > 0.0001) {
+        locationCacheRef.current = newLocation;
+        setVetLiveLocation(newLocation);
+
+        // Send to backend
+        await locationService.updateDistressLocation(distressId, coords);
+        lastLocationUpdateRef.current = now;
+        console.log('Vet location updated:', coords);
       }
-    };
-  }, [distressId, distress?.selectedVetId, wasDeclined, sendVetLocation]);
+    } catch (error) {
+      console.error('Failed to update vet location:', error);
+    }
+  }, [distressId, distress?.selectedVetId, wasDeclined]);
+
+  // Initial location fetch
+  useEffect(() => {
+    if (distressId && distress?.selectedVetId && !wasDeclined) {
+      updateVetLocation();
+    }
+  }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
 
   // Handle distress updates
   const handleDistressUpdated = useCallback(() => {
@@ -131,11 +136,6 @@ export const VetTracking = () => {
     pollingInterval: 20000, // 20 seconds auto-refresh
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
-      // Stop location watching
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
       toast.success("Emergency resolved!");
       navigate(ROUTES.VET_DASHBOARD);
     },
@@ -143,10 +143,24 @@ export const VetTracking = () => {
     enabled: !!distressId && !wasDeclined && distress?.status !== 'resolved' && distress?.status !== 'cancelled',
   });
 
+  // Auto-update location every 10 seconds
+  useEffect(() => {
+    if (!distressId || !distress?.selectedVetId || wasDeclined) return;
+
+    const interval = setInterval(() => {
+      updateVetLocation();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
+
   const handleRefresh = useCallback(() => {
+    // Force location update by resetting the timer
+    lastLocationUpdateRef.current = 0;
+    updateVetLocation();
     refresh();
     toast.success("Refreshing emergency data...");
-  }, [refresh]);
+  }, [refresh, updateVetLocation]);
 
   const handleResolve = async () => {
     if (!distressId) return;
@@ -154,12 +168,8 @@ export const VetTracking = () => {
     setIsResolving(true);
 
     try {
-      // Stop polling and location watching first
+      // Stop polling first
       stopPolling();
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
 
       await distressService.resolveDistress(distressId);
       toast.success("Emergency resolved! Thank you.");

@@ -42,44 +42,51 @@ export const Tracking = () => {
     lng: number;
   } | null>(null);
   const [showAIChatbot, setShowAIChatbot] = useState(false);
-  const locationWatchRef = useRef<number | null>(null);
+  const lastLocationUpdateRef = useRef<number>(0);
+  const locationCacheRef = useRef<{ lat: number; lng: number } | null>(null);
 
-  const sendUserLocation = useCallback(async (coords: [number, number]) => {
+  // Get and cache user location, only update every 10 seconds
+  const updateUserLocation = useCallback(async () => {
     if (!activeDistress?._id) return;
+
+    const now = Date.now();
+    // Only update if 10 seconds have passed since last update
+    if (now - lastLocationUpdateRef.current < 10000 && locationCacheRef.current) {
+      return;
+    }
+
     try {
-      await locationService.updateDistressLocation(activeDistress._id, coords);
-      console.log('User location sent:', coords);
+      const position = await locationService.getCurrentPosition();
+      const coords: [number, number] = [
+        position.coords.longitude,
+        position.coords.latitude,
+      ];
+
+      const newLocation = { lng: coords[0], lat: coords[1] };
+
+      // Only update if coordinates actually changed significantly (more than ~10 meters)
+      if (!locationCacheRef.current ||
+          Math.abs(locationCacheRef.current.lat - newLocation.lat) > 0.0001 ||
+          Math.abs(locationCacheRef.current.lng - newLocation.lng) > 0.0001) {
+        locationCacheRef.current = newLocation;
+        setUserLiveLocation(newLocation);
+
+        // Send to backend
+        await locationService.updateDistressLocation(activeDistress._id, coords);
+        lastLocationUpdateRef.current = now;
+        console.log('User location updated:', coords);
+      }
     } catch (error) {
-      console.error('Failed to send user location:', error);
+      console.error('Failed to update user location:', error);
     }
   }, [activeDistress?._id]);
 
+  // Initial location fetch
   useEffect(() => {
-    if (!activeDistress?._id) return;
-
-    const watchId = locationService.watchPosition(
-      (position) => {
-        const coords: [number, number] = [
-          position.coords.longitude,
-          position.coords.latitude,
-        ];
-        setUserLiveLocation({ lng: coords[0], lat: coords[1] });
-        sendUserLocation(coords);
-      },
-      (error) => {
-        console.error('Location watch error:', error);
-      }
-    );
-
-    locationWatchRef.current = watchId;
-
-    return () => {
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
-    };
-  }, [activeDistress?._id, sendUserLocation]);
+    if (activeDistress?._id) {
+      updateUserLocation();
+    }
+  }, [activeDistress?._id, updateUserLocation]);
 
   const handleDistressUpdated = useCallback(() => {
     refreshActiveDistress();
@@ -100,11 +107,6 @@ export const Tracking = () => {
     pollingInterval: 20000, // 20 seconds auto-refresh
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
-      // Stop location watching
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
       toast.success("Emergency resolved!");
       clearDistress();
       navigate(ROUTES.DASHBOARD);
@@ -113,10 +115,24 @@ export const Tracking = () => {
     enabled: !!activeDistress?._id && activeDistress?.status !== 'resolved' && activeDistress?.status !== 'cancelled',
   });
 
+  // Auto-update location every 10 seconds
+  useEffect(() => {
+    if (!activeDistress?._id) return;
+
+    const interval = setInterval(() => {
+      updateUserLocation();
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [activeDistress?._id, updateUserLocation]);
+
   const handleRefresh = useCallback(() => {
+    // Force location update by resetting the timer
+    lastLocationUpdateRef.current = 0;
+    updateUserLocation();
     refresh();
     toast.success("Refreshing emergency data...");
-  }, [refresh]);
+  }, [refresh, updateUserLocation]);
 
   useEffect(() => {
     if (!activeDistress) {
@@ -154,12 +170,8 @@ export const Tracking = () => {
     setIsCancelling(true);
 
     try {
-      // Stop polling and location watching first
+      // Stop polling first
       stopPolling();
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
 
       await distressService.cancelDistress(activeDistress._id);
       toast.success("Emergency cancelled");
@@ -180,12 +192,8 @@ export const Tracking = () => {
     setIsResolving(true);
 
     try {
-      // Stop polling and location watching first
+      // Stop polling first
       stopPolling();
-      if (locationWatchRef.current !== null) {
-        locationService.clearWatch(locationWatchRef.current);
-        locationWatchRef.current = null;
-      }
 
       await distressService.resolveDistress(activeDistress._id);
       toast.success("Emergency resolved! Thank you.");

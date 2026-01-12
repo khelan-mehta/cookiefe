@@ -22,8 +22,22 @@ export const Header = () => {
       const fetchVetEmergency = async () => {
         try {
           const response = await distressService.getActiveDistress();
-          if (response.distress && response.distress.selectedVetId?._id === vetProfile._id) {
-            setVetActiveEmergency(response.distress);
+          console.log('Vet active emergency response:', response);
+
+          if (response.distress) {
+            // Handle both string and object selectedVetId
+            const selectedVetId = typeof response.distress.selectedVetId === 'string'
+              ? response.distress.selectedVetId
+              : response.distress.selectedVetId?._id;
+
+            console.log('Selected vet ID:', selectedVetId, 'Current vet profile ID:', vetProfile._id);
+
+            if (selectedVetId === vetProfile._id) {
+              setVetActiveEmergency(response.distress);
+              console.log('Active emergency set for vet');
+            } else {
+              setVetActiveEmergency(null);
+            }
           } else {
             setVetActiveEmergency(null);
           }
@@ -44,6 +58,15 @@ export const Header = () => {
   const hasActiveEmergency = activeEmergency &&
     activeEmergency.status !== 'resolved' &&
     activeEmergency.status !== 'cancelled';
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Header - User role:', user?.role);
+    console.log('Header - User active distress:', userActiveDistress);
+    console.log('Header - Vet active emergency:', vetActiveEmergency);
+    console.log('Header - Active emergency:', activeEmergency);
+    console.log('Header - Has active emergency:', hasActiveEmergency);
+  }, [user?.role, userActiveDistress, vetActiveEmergency, activeEmergency, hasActiveEmergency]);
 
   const handleLogout = async () => {
     await logout();
