@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FiCheck, FiX, FiPhone, FiMapPin, FiNavigation, FiArrowLeft, FiAlertCircle, FiRefreshCw } from "react-icons/fi";
@@ -15,6 +15,15 @@ import { locationService } from "../../services/location";
 import { distressService, type Distress } from "../../services/distress";
 import { ROUTES, DISTRESS_STATUS } from "../../utils/constants";
 
+// Constants for timing
+const LOCATION_UPDATE_INTERVAL = 20000; // 20 seconds
+const LOCATION_CHANGE_THRESHOLD = 0.0001; // ~10 meters
+
+interface Location {
+  lat: number;
+  lng: number;
+}
+
 export const VetTracking = () => {
   const navigate = useNavigate();
   const { distressId } = useParams<{ distressId: string }>();
@@ -23,18 +32,37 @@ export const VetTracking = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [vetLiveLocation, setVetLiveLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [vetLiveLocation, setVetLiveLocation] = useState<Location | null>(null);
   const [wasDeclined, setWasDeclined] = useState(false);
   const [showAIChatbot, setShowAIChatbot] = useState(false);
+  
+  // Refs for tracking location updates
   const lastLocationUpdateRef = useRef<number>(0);
-  const locationCacheRef = useRef<{ lat: number; lng: number } | null>(null);
+  const locationCacheRef = useRef<Location | null>(null);
+  const isUpdatingLocationRef = useRef(false);
+
+  // Stable setter for user location - only updates if values actually changed
+  const updateUserLocation = useCallback((newLoc: Location | null) => {
+    setUserLocation(prev => {
+      if (!newLoc) return null;
+      if (prev && prev.lat === newLoc.lat && prev.lng === newLoc.lng) {
+        return prev; // Return same reference if unchanged
+      }
+      return newLoc;
+    });
+  }, []);
+
+  // Stable setter for vet location - only updates if values actually changed
+  const updateVetLiveLocation = useCallback((newLoc: Location | null) => {
+    setVetLiveLocation(prev => {
+      if (!newLoc) return null;
+      if (prev && prev.lat === newLoc.lat && prev.lng === newLoc.lng) {
+        return prev; // Return same reference if unchanged
+      }
+      return newLoc;
+    });
+  }, []);
 
   // Load distress details
   const loadDistress = useCallback(async () => {
@@ -46,7 +74,6 @@ export const VetTracking = () => {
 
       // Check if this vet was selected or declined
       if (result.distress.selectedVetId && vetProfile) {
-        // Check if current vet is the selected one
         if (result.distress.selectedVetId._id !== vetProfile._id) {
           setWasDeclined(true);
         }
@@ -54,7 +81,7 @@ export const VetTracking = () => {
 
       // Set initial user location from distress
       if (result.distress.location?.coordinates) {
-        setUserLocation({
+        updateUserLocation({
           lng: result.distress.location.coordinates[0],
           lat: result.distress.location.coordinates[1],
         });
@@ -66,21 +93,27 @@ export const VetTracking = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [distressId, navigate, vetProfile]);
+  }, [distressId, navigate, vetProfile, updateUserLocation]);
 
   useEffect(() => {
     loadDistress();
   }, [loadDistress]);
 
-  // Get and cache vet location, only update every 10 seconds
-  const updateVetLocation = useCallback(async () => {
+  // Get and cache vet location with throttling
+  const updateVetLocation = useCallback(async (force: boolean = false) => {
     if (!distressId || !distress?.selectedVetId || wasDeclined) return;
+    
+    // Prevent concurrent updates
+    if (isUpdatingLocationRef.current) return;
 
     const now = Date.now();
-    // Only update if 10 seconds have passed since last update
-    if (now - lastLocationUpdateRef.current < 10000 && locationCacheRef.current) {
+    
+    // Only update if enough time has passed since last update (unless forced)
+    if (!force && now - lastLocationUpdateRef.current < LOCATION_UPDATE_INTERVAL && locationCacheRef.current) {
       return;
     }
+
+    isUpdatingLocationRef.current = true;
 
     try {
       const position = await locationService.getCurrentPosition();
@@ -89,75 +122,89 @@ export const VetTracking = () => {
         position.coords.latitude,
       ];
 
-      const newLocation = { lng: coords[0], lat: coords[1] };
+      const newLocation: Location = { lng: coords[0], lat: coords[1] };
 
-      // Only update if coordinates actually changed significantly (more than ~10 meters)
-      if (!locationCacheRef.current ||
-          Math.abs(locationCacheRef.current.lat - newLocation.lat) > 0.0001 ||
-          Math.abs(locationCacheRef.current.lng - newLocation.lng) > 0.0001) {
+      // Check if coordinates changed significantly
+      const hasSignificantChange = !locationCacheRef.current ||
+        Math.abs(locationCacheRef.current.lat - newLocation.lat) > LOCATION_CHANGE_THRESHOLD ||
+        Math.abs(locationCacheRef.current.lng - newLocation.lng) > LOCATION_CHANGE_THRESHOLD;
+
+      if (hasSignificantChange) {
         locationCacheRef.current = newLocation;
-        setVetLiveLocation(newLocation);
+        updateVetLiveLocation(newLocation);
 
         // Send to backend
         await locationService.updateDistressLocation(distressId, coords);
         lastLocationUpdateRef.current = now;
         console.log('Vet location updated:', coords);
+      } else {
+        // Update timestamp even if location didn't change significantly
+        lastLocationUpdateRef.current = now;
       }
     } catch (error) {
       console.error('Failed to update vet location:', error);
+    } finally {
+      isUpdatingLocationRef.current = false;
     }
-  }, [distressId, distress?.selectedVetId, wasDeclined]);
+  }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLiveLocation]);
 
   // Initial location fetch
   useEffect(() => {
     if (distressId && distress?.selectedVetId && !wasDeclined) {
-      updateVetLocation();
+      updateVetLocation(true); // Force initial update
     }
   }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
 
-  // Handle distress updates
+  // Handle distress updates from polling
   const handleDistressUpdated = useCallback(() => {
     loadDistress();
   }, [loadDistress]);
 
-  // Handle location updates (user location)
+  // Handle location updates (user location) from polling
   const handleLocationUpdate = useCallback(
     (data: { coordinates: [number, number] }) => {
-      setUserLocation({
+      updateUserLocation({
         lng: data.coordinates[0],
         lat: data.coordinates[1],
       });
     },
-    []
+    [updateUserLocation]
   );
+
+  // Determine if polling should be enabled
+  const shouldPoll = useMemo(() => {
+    return !!distressId && 
+           !wasDeclined && 
+           distress?.status !== 'resolved' && 
+           distress?.status !== 'cancelled';
+  }, [distressId, wasDeclined, distress?.status]);
 
   const { stopPolling, refresh, isPolling } = usePolling({
     distressId: distressId,
-    pollingInterval: 20000, // 20 seconds auto-refresh
+    pollingInterval: LOCATION_UPDATE_INTERVAL,
     onDistressUpdated: handleDistressUpdated,
     onDistressResolved: () => {
       toast.success("Emergency resolved!");
       navigate(ROUTES.VET_DASHBOARD);
     },
     onLocationUpdate: handleLocationUpdate,
-    enabled: !!distressId && !wasDeclined && distress?.status !== 'resolved' && distress?.status !== 'cancelled',
+    enabled: shouldPoll,
   });
 
-  // Auto-update location every 10 seconds
+  // Auto-update vet location at interval
   useEffect(() => {
     if (!distressId || !distress?.selectedVetId || wasDeclined) return;
 
     const interval = setInterval(() => {
-      updateVetLocation();
-    }, 10000); // 10 seconds
+      updateVetLocation(false);
+    }, LOCATION_UPDATE_INTERVAL);
 
     return () => clearInterval(interval);
   }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
 
   const handleRefresh = useCallback(() => {
-    // Force location update by resetting the timer
-    lastLocationUpdateRef.current = 0;
-    updateVetLocation();
+    // Force location update
+    updateVetLocation(true);
     refresh();
     toast.success("Refreshing emergency data...");
   }, [refresh, updateVetLocation]);
@@ -168,9 +215,7 @@ export const VetTracking = () => {
     setIsResolving(true);
 
     try {
-      // Stop polling first
       stopPolling();
-
       await distressService.resolveDistress(distressId);
       toast.success("Emergency resolved! Thank you.");
       navigate(ROUTES.VET_DASHBOARD);
@@ -182,6 +227,28 @@ export const VetTracking = () => {
       setShowResolveModal(false);
     }
   };
+
+  // Memoize derived state
+  const isInProgress = useMemo(() => 
+    distress?.status === DISTRESS_STATUS.IN_PROGRESS, 
+    [distress?.status]
+  );
+  
+  const isWaitingForSelection = useMemo(() => 
+    distress?.status === DISTRESS_STATUS.RESPONDED && !distress.selectedVetId,
+    [distress?.status, distress?.selectedVetId]
+  );
+
+  // Memoize location props to prevent unnecessary re-renders
+  const memoizedUserLocation = useMemo(() => 
+    userLocation || undefined, 
+    [userLocation]
+  );
+  
+  const memoizedVetLocation = useMemo(() => 
+    vetLiveLocation || undefined, 
+    [vetLiveLocation]
+  );
 
   if (isLoading) {
     return (
@@ -246,9 +313,6 @@ export const VetTracking = () => {
       </Layout>
     );
   }
-
-  const isInProgress = distress.status === DISTRESS_STATUS.IN_PROGRESS;
-  const isWaitingForSelection = distress.status === DISTRESS_STATUS.RESPONDED && !distress.selectedVetId;
 
   return (
     <Layout>
@@ -326,12 +390,12 @@ export const VetTracking = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Map */}
+          {/* Map - Using memoized props */}
           <Card className="lg:row-span-2 overflow-hidden">
             <CardBody className="p-0">
               <LiveMap
-                userLocation={userLocation || undefined}
-                vetLocation={vetLiveLocation || undefined}
+                userLocation={memoizedUserLocation}
+                vetLocation={memoizedVetLocation}
                 showRoute={isInProgress}
                 className="h-[300px] lg:h-[500px] rounded-xl"
               />
