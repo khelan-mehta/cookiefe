@@ -72,10 +72,35 @@ export const VetTracking = () => {
       const result = await distressService.getDistress(distressId);
       setDistress(result.distress);
 
-      // Check if this vet was selected or declined
-      if (result.distress.selectedVetId && vetProfile) {
-        if (result.distress.selectedVetId._id !== vetProfile._id) {
-          setWasDeclined(true);
+      // Check if this vet was declined
+      // A vet is declined ONLY if:
+      // 1. A selectedVetId exists (user has made a selection)
+      // 2. The selectedVetId is NOT the current vet
+      // 3. The current vet had responded to this distress (is in respondedVets array)
+      if (vetProfile && result.distress.selectedVetId) {
+        const selectedVetIdString = typeof result.distress.selectedVetId === 'object' 
+          ? result.distress.selectedVetId._id 
+          : result.distress.selectedVetId;
+        
+        const isCurrentVetSelected = selectedVetIdString === vetProfile._id;
+        
+        if (!isCurrentVetSelected) {
+          // Check if current vet was one of the respondents
+          const respondedVets = result.distress.respondedVets || [];
+          const hadResponded = respondedVets.some((response: any) => {
+            const vetId = typeof response.vetId === 'object' 
+              ? response.vetId._id 
+              : response.vetId;
+            return vetId === vetProfile._id;
+          });
+          
+          // Only mark as declined if vet had responded but wasn't selected
+          if (hadResponded) {
+            setWasDeclined(true);
+          }
+        } else {
+          // Current vet IS the selected vet - make sure wasDeclined is false
+          setWasDeclined(false);
         }
       }
 
@@ -148,12 +173,23 @@ export const VetTracking = () => {
     }
   }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLiveLocation]);
 
-  // Initial location fetch
+  // Check if current vet is the selected vet
+  const isCurrentVetSelected = useMemo(() => {
+    if (!distress?.selectedVetId || !vetProfile) return false;
+    
+    const selectedVetIdString = typeof distress.selectedVetId === 'object'
+      ? distress.selectedVetId._id
+      : distress.selectedVetId;
+    
+    return selectedVetIdString === vetProfile._id;
+  }, [distress?.selectedVetId, vetProfile]);
+
+  // Initial location fetch - only if current vet is selected
   useEffect(() => {
-    if (distressId && distress?.selectedVetId && !wasDeclined) {
+    if (distressId && isCurrentVetSelected && !wasDeclined) {
       updateVetLocation(true); // Force initial update
     }
-  }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
+  }, [distressId, isCurrentVetSelected, wasDeclined, updateVetLocation]);
 
   // Handle distress updates from polling
   const handleDistressUpdated = useCallback(() => {
@@ -191,23 +227,25 @@ export const VetTracking = () => {
     enabled: shouldPoll,
   });
 
-  // Auto-update vet location at interval
+  // Auto-update vet location at interval - only if current vet is selected
   useEffect(() => {
-    if (!distressId || !distress?.selectedVetId || wasDeclined) return;
+    if (!distressId || !isCurrentVetSelected || wasDeclined) return;
 
     const interval = setInterval(() => {
       updateVetLocation(false);
     }, LOCATION_UPDATE_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [distressId, distress?.selectedVetId, wasDeclined, updateVetLocation]);
+  }, [distressId, isCurrentVetSelected, wasDeclined, updateVetLocation]);
 
   const handleRefresh = useCallback(() => {
     // Force location update
-    updateVetLocation(true);
+    if (isCurrentVetSelected) {
+      updateVetLocation(true);
+    }
     refresh();
     toast.success("Refreshing emergency data...");
-  }, [refresh, updateVetLocation]);
+  }, [refresh, updateVetLocation, isCurrentVetSelected]);
 
   const handleResolve = async () => {
     if (!distressId) return;
@@ -260,7 +298,7 @@ export const VetTracking = () => {
     );
   }
 
-  // Show declined message
+  // Show declined message - only if vet responded but wasn't selected
   if (wasDeclined) {
     return (
       <Layout>

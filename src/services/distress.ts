@@ -17,6 +17,7 @@ export interface DistressResponse {
 }
 
 export interface Distress {
+  respondedVets: any[];
   _id: string;
   userId: {
     _id: string;
