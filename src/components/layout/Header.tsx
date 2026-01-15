@@ -1,40 +1,57 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiLogOut, FiMenu, FiX, FiHome, FiShoppingBag, FiAlertCircle, FiPackage } from 'react-icons/fi';
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { useDistress } from '../../context/DistressContext';
-import { distressService, type Distress } from '../../services/distress';
-import { ROUTES } from '../../utils/constants';
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  FiUser,
+  FiLogOut,
+  FiMenu,
+  FiX,
+  FiHome,
+  FiShoppingBag,
+  FiAlertCircle,
+  FiPackage,
+} from "react-icons/fi";
+import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { useDistress } from "../../context/DistressContext";
+import { distressService, type Distress } from "../../services/distress";
+import { ROUTES } from "../../utils/constants";
 
 export const Header = () => {
   const { user, logout, isAuthenticated, vetProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [vetActiveEmergency, setVetActiveEmergency] = useState<Distress | null>(null);
+  const [vetActiveEmergency, setVetActiveEmergency] = useState<Distress | null>(
+    null
+  );
 
   // Always call useDistress hook (DistressProvider wraps everything)
   const { activeDistress: userActiveDistress } = useDistress();
 
   // Fetch vet's assigned emergencies (for vets)
   useEffect(() => {
-    if (user?.role === 'vet' && isAuthenticated && vetProfile) {
+    if (user?.role === "vet" && isAuthenticated && vetProfile) {
       const fetchVetEmergency = async () => {
         try {
           const response = await distressService.getActiveDistress();
-          console.log('Vet active emergency response:', response);
+          console.log("Vet active emergency response:", response);
 
           if (response.distress) {
             // Handle both string and object selectedVetId
-            const selectedVetId = typeof response.distress.selectedVetId === 'string'
-              ? response.distress.selectedVetId
-              : response.distress.selectedVetId?._id;
+            const selectedVetId =
+              typeof response.distress.selectedVetId === "string"
+                ? response.distress.selectedVetId
+                : response.distress.selectedVetId?._id;
 
-            console.log('Selected vet ID:', selectedVetId, 'Current vet profile ID:', vetProfile._id);
+            console.log(
+              "Selected vet ID:",
+              selectedVetId,
+              "Current vet profile ID:",
+              vetProfile._id
+            );
 
             if (selectedVetId === vetProfile._id) {
               setVetActiveEmergency(response.distress);
-              console.log('Active emergency set for vet');
+              console.log("Active emergency set for vet");
             } else {
               setVetActiveEmergency(null);
             }
@@ -42,7 +59,7 @@ export const Header = () => {
             setVetActiveEmergency(null);
           }
         } catch (error) {
-          console.error('Failed to fetch vet emergency:', error);
+          console.error("Failed to fetch vet emergency:", error);
           setVetActiveEmergency(null);
         }
       };
@@ -54,19 +71,27 @@ export const Header = () => {
     }
   }, [user?.role, isAuthenticated, vetProfile]);
 
-  const activeEmergency = user?.role === 'vet' ? vetActiveEmergency : userActiveDistress;
-  const hasActiveEmergency = activeEmergency &&
-    activeEmergency.status !== 'resolved' &&
-    activeEmergency.status !== 'cancelled';
+  const activeEmergency =
+    user?.role === "vet" ? vetActiveEmergency : userActiveDistress;
+  const hasActiveEmergency =
+    activeEmergency &&
+    activeEmergency.status !== "resolved" &&
+    activeEmergency.status !== "cancelled";
 
   // Debug logging
   useEffect(() => {
-    console.log('Header - User role:', user?.role);
-    console.log('Header - User active distress:', userActiveDistress);
-    console.log('Header - Vet active emergency:', vetActiveEmergency);
-    console.log('Header - Active emergency:', activeEmergency);
-    console.log('Header - Has active emergency:', hasActiveEmergency);
-  }, [user?.role, userActiveDistress, vetActiveEmergency, activeEmergency, hasActiveEmergency]);
+    console.log("Header - User role:", user?.role);
+    console.log("Header - User active distress:", userActiveDistress);
+    console.log("Header - Vet active emergency:", vetActiveEmergency);
+    console.log("Header - Active emergency:", activeEmergency);
+    console.log("Header - Has active emergency:", hasActiveEmergency);
+  }, [
+    user?.role,
+    userActiveDistress,
+    vetActiveEmergency,
+    activeEmergency,
+    hasActiveEmergency,
+  ]);
 
   const handleLogout = async () => {
     await logout();
@@ -74,18 +99,26 @@ export const Header = () => {
   };
 
   const getDashboardRoute = () => {
-    return user?.role === 'vet' ? ROUTES.VET_DASHBOARD : ROUTES.DASHBOARD;
+    return user?.role === "vet" ? ROUTES.VET_DASHBOARD : ROUTES.DASHBOARD;
   };
 
   const isActive = (path: string) => location.pathname === path;
 
-  const NavLink = ({ to, icon: Icon, children }: { to: string; icon: React.ElementType; children: React.ReactNode }) => (
+  const NavLink = ({
+    to,
+    icon: Icon,
+    children,
+  }: {
+    to: string;
+    icon: React.ElementType;
+    children: React.ReactNode;
+  }) => (
     <Link
       to={to}
       className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all font-medium ${
         isActive(to)
-          ? 'bg-[#FD7979] text-white shadow-[0_3px_0_#E05A5A]'
-          : 'text-[#5D4E4E] hover:bg-[#FFCDC9] hover:text-[#5D4E4E]'
+          ? "bg-[#FD7979] text-white shadow-[0_3px_0_#E05A5A]"
+          : "text-[#5D4E4E] hover:bg-[#FFCDC9] hover:text-[#5D4E4E]"
       }`}
     >
       <Icon className="h-4 w-4" />
@@ -101,21 +134,16 @@ export const Header = () => {
           <div className="flex justify-between items-center h-16">
             {/* Logo with cute paw design */}
             <Link
-  to={getDashboardRoute()}
-  className="flex items-center gap-2 group"
->
-  <img
-    src="/logo.png"
-    alt="Cookie logo"
-    className="
-      h-8 w-8
-      rounded-full
-      object-cover
-      border border-[#FD7979]/30
-      shadow-sm
-    "
-  />
-  <span className="
+              to={getDashboardRoute()}
+              className="flex items-center gap-2 group"
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Cookie logo"
+                className="h-8 w-8 rounded-full object-cover border border-[#FD7979]/30 shadow-sm"
+              />
+              <span
+                className="
     font-bold
     text-lg
     text-[#5D4E4E]
@@ -123,10 +151,11 @@ export const Header = () => {
     transition-colors
     mt-1
     ml-2
-  ">
-    Cookie
-  </span>
-</Link>
+  "
+              >
+                Cookie
+              </span>
+            </Link>
 
             {isAuthenticated && (
               <>
@@ -136,14 +165,17 @@ export const Header = () => {
                     <NavLink to={getDashboardRoute()} icon={FiHome}>
                       Home
                     </NavLink>
-                    {user?.role === 'user' && (
+                    {user?.role === "user" && (
                       <NavLink to={ROUTES.STORE} icon={FiShoppingBag}>
                         Store
                       </NavLink>
                     )}
-                    {user?.role === 'vet' && (
+                    {user?.role === "vet" && (
                       <>
-                        <NavLink to={ROUTES.VET_DISTRESS_LIST} icon={FiAlertCircle}>
+                        <NavLink
+                          to={ROUTES.VET_DISTRESS_LIST}
+                          icon={FiAlertCircle}
+                        >
                           Alerts
                         </NavLink>
                         <NavLink to={ROUTES.VET_STORE} icon={FiPackage}>
@@ -156,12 +188,18 @@ export const Header = () => {
                   {/* Active Emergency Indicator */}
                   {hasActiveEmergency && (
                     <Link
-                      to={user?.role === 'vet' ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}` : ROUTES.TRACKING}
+                      to={
+                        user?.role === "vet"
+                          ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}`
+                          : ROUTES.TRACKING
+                      }
                       className="flex items-center gap-2 px-4 py-2 bg-[#FD7979] text-white rounded-full hover:bg-[#E05A5A] transition-all shadow-[0_3px_0_#E05A5A] animate-pulse"
                     >
                       <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                       <FiAlertCircle className="h-4 w-4" />
-                      <span className="font-medium text-sm">Active Emergency</span>
+                      <span className="font-medium text-sm">
+                        Active Emergency
+                      </span>
                     </Link>
                   )}
                 </nav>
@@ -172,8 +210,8 @@ export const Header = () => {
                     to={ROUTES.PROFILE}
                     className={`flex items-center gap-2 px-3 py-2 rounded-full transition-all ${
                       isActive(ROUTES.PROFILE)
-                        ? 'bg-[#FFCDC9] border-2 border-[#FDACAC]'
-                        : 'hover:bg-[#FEEAC9] border-2 border-transparent'
+                        ? "bg-[#FFCDC9] border-2 border-[#FDACAC]"
+                        : "hover:bg-[#FEEAC9] border-2 border-transparent"
                     }`}
                   >
                     {user?.avatar ? (
@@ -205,8 +243,8 @@ export const Header = () => {
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                   className={`md:hidden p-2.5 rounded-full transition-all border-2 ${
                     isMenuOpen
-                      ? 'bg-[#FD7979] text-white border-[#FD7979]'
-                      : 'text-[#5D4E4E] border-[#FFCDC9] hover:bg-[#FEEAC9]'
+                      ? "bg-[#FD7979] text-white border-[#FD7979]"
+                      : "text-[#5D4E4E] border-[#FFCDC9] hover:bg-[#FEEAC9]"
                   }`}
                 >
                   {isMenuOpen ? (
@@ -223,7 +261,11 @@ export const Header = () => {
 
       {/* Decorative wave bottom */}
       <div className="relative h-3 bg-transparent overflow-hidden rotate-180">
-        <svg className="absolute bottom-0 w-full h-6" viewBox="0 0 1200 24" preserveAspectRatio="none">
+        <svg
+          className="absolute bottom-0 w-full h-6"
+          viewBox="0 0 1200 24"
+          preserveAspectRatio="none"
+        >
           <path
             d="M0,24 C200,0 400,24 600,12 C800,0 1000,24 1200,12 L1200,24 L0,24 Z"
             fill="white"
@@ -238,7 +280,11 @@ export const Header = () => {
             {/* Active Emergency Indicator - Mobile */}
             {hasActiveEmergency && (
               <Link
-                to={user?.role === 'vet' ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}` : ROUTES.TRACKING}
+                to={
+                  user?.role === "vet"
+                    ? `${ROUTES.VET_TRACKING}/${activeEmergency._id}`
+                    : ROUTES.TRACKING
+                }
                 className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#FD7979] text-white animate-pulse"
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -252,21 +298,21 @@ export const Header = () => {
               to={getDashboardRoute()}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 isActive(getDashboardRoute())
-                  ? 'bg-[#FD7979] text-white'
-                  : 'text-[#5D4E4E] hover:bg-[#FEEAC9]'
+                  ? "bg-[#FD7979] text-white"
+                  : "text-[#5D4E4E] hover:bg-[#FEEAC9]"
               }`}
               onClick={() => setIsMenuOpen(false)}
             >
               <FiHome className="h-5 w-5" />
               <span className="font-medium">Dashboard</span>
             </Link>
-            {user?.role === 'user' && (
+            {user?.role === "user" && (
               <Link
                 to={ROUTES.STORE}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive(ROUTES.STORE)
-                    ? 'bg-[#FD7979] text-white'
-                    : 'text-[#5D4E4E] hover:bg-[#FEEAC9]'
+                    ? "bg-[#FD7979] text-white"
+                    : "text-[#5D4E4E] hover:bg-[#FEEAC9]"
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -274,14 +320,14 @@ export const Header = () => {
                 <span className="font-medium">Store</span>
               </Link>
             )}
-            {user?.role === 'vet' && (
+            {user?.role === "vet" && (
               <>
                 <Link
                   to={ROUTES.VET_DISTRESS_LIST}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                     isActive(ROUTES.VET_DISTRESS_LIST)
-                      ? 'bg-[#FD7979] text-white'
-                      : 'text-[#5D4E4E] hover:bg-[#FEEAC9]'
+                      ? "bg-[#FD7979] text-white"
+                      : "text-[#5D4E4E] hover:bg-[#FEEAC9]"
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -292,8 +338,8 @@ export const Header = () => {
                   to={ROUTES.VET_STORE}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                     isActive(ROUTES.VET_STORE)
-                      ? 'bg-[#FD7979] text-white'
-                      : 'text-[#5D4E4E] hover:bg-[#FEEAC9]'
+                      ? "bg-[#FD7979] text-white"
+                      : "text-[#5D4E4E] hover:bg-[#FEEAC9]"
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -309,8 +355,8 @@ export const Header = () => {
               to={ROUTES.PROFILE}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                 isActive(ROUTES.PROFILE)
-                  ? 'bg-[#FD7979] text-white'
-                  : 'text-[#5D4E4E] hover:bg-[#FEEAC9]'
+                  ? "bg-[#FD7979] text-white"
+                  : "text-[#5D4E4E] hover:bg-[#FEEAC9]"
               }`}
               onClick={() => setIsMenuOpen(false)}
             >
