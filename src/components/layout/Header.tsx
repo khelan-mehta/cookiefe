@@ -138,7 +138,7 @@ export const Header = () => {
               className="flex items-center gap-2 group"
             >
               <img
-                src={`${import.meta.env.BASE_URL}logo.png`}
+                src={`https://direct-upload-s3-khelan.s3.eu-north-1.amazonaws.com/product-images/271dde41-7721-4fc5-a958-e3cb89619533.jpeg`}
                 alt="Cookie logo"
                 className="h-8 w-8 rounded-full object-cover border border-[#FD7979]/30 shadow-sm"
               />
