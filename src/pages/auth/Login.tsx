@@ -51,20 +51,15 @@ export const Login = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#FEEAC9] px-4">
       <div className="w-full max-w-md">
         {/* Logo Section */}
-        <div className="text-center mb-8">
-          <div className="w-24 h-24 mx-auto mb-4 bg-[#FD7979] rounded-full flex items-center justify-center shadow-[0_6px_0_#E05A5A]">
-            <svg className="w-14 h-14 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="7" cy="8" r="2"/>
-              <circle cx="17" cy="8" r="2"/>
-              <circle cx="5" cy="14" r="1.5"/>
-              <circle cx="19" cy="14" r="1.5"/>
-              <ellipse cx="12" cy="15" rx="4" ry="3"/>
-            </svg>
-          </div>
-          <h1 className="text-4xl font-bold text-[#5D4E4E]">Cookie</h1>
-          <p className="text-[#5D4E4E] mt-2 flex items-center justify-center gap-2 text-lg">
-            Every life deserves a life <FiHeart className="text-[#FD7979]" />
-          </p>
+        <div className="text-center flex flex-col  justify-center mb-8">
+          <img
+            src={`https://direct-upload-s3-khelan.s3.eu-north-1.amazonaws.com/product-images/271dde41-7721-4fc5-a958-e3cb89619533.jpeg`}
+            alt="Cookie logo"
+            className="h-48 w-48 self-center rounded-full object-cover  border-[white] border-4 shadow-xl"
+          />
+          <h1 className="text-3xl mt-6 mb-3 text-[#E3735B] font-bold">Cookie</h1>
+          <p>Because Every Life Deserves a Life</p>
+
         </div>
 
         {/* Login Card */}
