@@ -1,14 +1,14 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { FiUser, FiHeart } from 'react-icons/fi';
-import { authService } from '../../services/auth';
-import { useAuth } from '../../context/AuthContext';
-import { ROUTES } from '../../utils/constants';
-import { isValidPhone } from '../../utils/validators';
-import { Button } from '../../components/common/Button';
-import { Input } from '../../components/common/Input';
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { FiUser, FiHeart } from "react-icons/fi";
+import { authService } from "../../services/auth";
+import { useAuth } from "../../context/AuthContext";
+import { ROUTES } from "../../utils/constants";
+import { isValidPhone } from "../../utils/validators";
+import { Button } from "../../components/common/Button";
+import { Input } from "../../components/common/Input";
 
-type Role = 'user' | 'vet';
+type Role = "user" | "vet";
 
 export const RoleSelect = () => {
   const navigate = useNavigate();
@@ -16,8 +16,8 @@ export const RoleSelect = () => {
   const { login } = useAuth();
   const tempData = location.state?.tempData;
 
-  const [role, setRole] = useState<Role>('user');
-  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState<Role>("user");
+  const [phone, setPhone] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +31,7 @@ export const RoleSelect = () => {
     setError(null);
 
     if (!isValidPhone(phone)) {
-      setError('Please enter a valid 10-digit phone number');
+      setError("Please enter a valid 10-digit phone number");
       return;
     }
 
@@ -45,9 +45,9 @@ export const RoleSelect = () => {
       });
 
       login(response.token, response.user);
-      navigate(role === 'vet' ? ROUTES.VET_DASHBOARD : ROUTES.DASHBOARD);
+      navigate(role === "vet" ? ROUTES.VET_DASHBOARD : ROUTES.DASHBOARD);
     } catch (err) {
-      setError('Registration failed. Please try again.');
+      setError("Registration failed. Please try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -59,14 +59,16 @@ export const RoleSelect = () => {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 mx-auto mb-4 bg-[#FD7979] rounded-full flex items-center justify-center shadow-[0_5px_0_#E05A5A]">
-            <svg className="w-12 h-12 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="7" cy="8" r="2"/>
-              <circle cx="17" cy="8" r="2"/>
-              <circle cx="5" cy="14" r="1.5"/>
-              <circle cx="19" cy="14" r="1.5"/>
-              <ellipse cx="12" cy="15" rx="4" ry="3"/>
-            </svg>
+          <div className="text-center flex flex-col  justify-center mb-8">
+            <img
+              src={`https://direct-upload-s3-khelan.s3.eu-north-1.amazonaws.com/product-images/271dde41-7721-4fc5-a958-e3cb89619533.jpeg`}
+              alt="Cookie logo"
+              className="h-24 w-24 mt-2 self-center rounded-full object-cover  border-[white] border-4 shadow-xl"
+            />
+            <h1 className="text-3xl mt-6 mb-3 text-[#E3735B] font-bold">
+              Cookie
+            </h1>
+            <p>Because Every Life Deserves a Life</p>
           </div>
           <h1 className="text-2xl font-bold text-[#5D4E4E]">
             Complete Your Profile
@@ -92,19 +94,29 @@ export const RoleSelect = () => {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setRole('user')}
+                  onClick={() => setRole("user")}
                   className={`p-5 border-2 rounded-xl flex flex-col items-center gap-2 transition-all ${
-                    role === 'user'
-                      ? 'border-[#FD7979] bg-[#FFCDC9] shadow-[0_4px_0_#FDACAC]'
-                      : 'border-[#FFCDC9] hover:border-[#FDACAC] bg-white'
+                    role === "user"
+                      ? "border-[#FD7979] bg-[#FFCDC9] shadow-[0_4px_0_#FDACAC]"
+                      : "border-[#FFCDC9] hover:border-[#FDACAC] bg-white"
                   }`}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    role === 'user' ? 'bg-[#FD7979]' : 'bg-[#FEEAC9]'
-                  }`}>
-                    <FiUser className={`h-6 w-6 ${role === 'user' ? 'text-white' : 'text-[#FDACAC]'}`} />
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      role === "user" ? "bg-[#FD7979]" : "bg-[#FEEAC9]"
+                    }`}
+                  >
+                    <FiUser
+                      className={`h-6 w-6 ${
+                        role === "user" ? "text-white" : "text-[#FDACAC]"
+                      }`}
+                    />
                   </div>
-                  <span className={`font-bold ${role === 'user' ? 'text-[#5D4E4E]' : 'text-[#5D4E4E]'}`}>
+                  <span
+                    className={`font-bold ${
+                      role === "user" ? "text-[#5D4E4E]" : "text-[#5D4E4E]"
+                    }`}
+                  >
                     Pet Parent
                   </span>
                   <span className="text-xs text-[#5D4E4E] opacity-70">
@@ -114,19 +126,29 @@ export const RoleSelect = () => {
 
                 <button
                   type="button"
-                  onClick={() => setRole('vet')}
+                  onClick={() => setRole("vet")}
                   className={`p-5 border-2 rounded-xl flex flex-col items-center gap-2 transition-all ${
-                    role === 'vet'
-                      ? 'border-[#FD7979] bg-[#FFCDC9] shadow-[0_4px_0_#FDACAC]'
-                      : 'border-[#FFCDC9] hover:border-[#FDACAC] bg-white'
+                    role === "vet"
+                      ? "border-[#FD7979] bg-[#FFCDC9] shadow-[0_4px_0_#FDACAC]"
+                      : "border-[#FFCDC9] hover:border-[#FDACAC] bg-white"
                   }`}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    role === 'vet' ? 'bg-[#FD7979]' : 'bg-[#FEEAC9]'
-                  }`}>
-                    <FiHeart className={`h-6 w-6 ${role === 'vet' ? 'text-white' : 'text-[#FDACAC]'}`} />
+                  <div
+                    className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      role === "vet" ? "bg-[#FD7979]" : "bg-[#FEEAC9]"
+                    }`}
+                  >
+                    <FiHeart
+                      className={`h-6 w-6 ${
+                        role === "vet" ? "text-white" : "text-[#FDACAC]"
+                      }`}
+                    />
                   </div>
-                  <span className={`font-bold ${role === 'vet' ? 'text-[#5D4E4E]' : 'text-[#5D4E4E]'}`}>
+                  <span
+                    className={`font-bold ${
+                      role === "vet" ? "text-[#5D4E4E]" : "text-[#5D4E4E]"
+                    }`}
+                  >
                     Vet / Helper
                   </span>
                   <span className="text-xs text-[#5D4E4E] opacity-70">
@@ -142,12 +164,19 @@ export const RoleSelect = () => {
                 type="tel"
                 placeholder="Enter 10-digit phone number"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                onChange={(e) =>
+                  setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+                }
                 maxLength={10}
               />
             </div>
 
-            <Button type="submit" isLoading={isLoading} className="w-full" size="lg">
+            <Button
+              type="submit"
+              isLoading={isLoading}
+              className="w-full"
+              size="lg"
+            >
               Continue
             </Button>
           </form>
